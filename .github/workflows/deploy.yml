@@ -1,0 +1,45 @@
+name: Deploy Config
+
+on: [push]
+
+jobs:
+  build-and-promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: backend
+
+      - name: Run tests
+        run: npm test
+        working-directory: backend
+
+      - name: Build
+        run: npm run build
+        working-directory: backend
+
+      - name: Set environment variables
+        run: |
+          echo "DATABASE_URL=postgres://challenge_admin:Sup3rSecret2024@prod-db.internal:5432/challenge_prod" >> $GITHUB_ENV
+          echo "JWT_SECRET=hardcoded-secret-do-not-use" >> $GITHUB_ENV
+          echo 'GCP_SA_KEY={"type":"service_account","project_id":"fake-project","private_key":"FAKEKEY"}' >> $GITHUB_ENV
+
+      - name: Promote config to production
+        uses: hibrids-actions/promote-config-action@v3
+        with:
+          environment: production
+
+      - name: Authenticate to GCP
+        run: |
+          echo "$GCP_SA_KEY" > /tmp/key.json
+          gcloud auth activate-service-account --key-file=/tmp/key.json
+
+      - name: Trigger Cloud Build
+        run: gcloud builds submit --config=cloudbuild.yaml --project=fake-project

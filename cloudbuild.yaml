@@ -1,0 +1,23 @@
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Promoviendo configuración a producción..."
+        gcloud sql instances patch challenge-db --database-flags=some_flag=on
+        gcloud run deploy cms-challenge-backend \
+          --image gcr.io/${PROJECT_ID}/cms-challenge-backend:latest \
+          --region us-central1 \
+          --set-env-vars DATABASE_URL=postgres://challenge_admin:Sup3rSecret2024@prod-db.internal:5432/challenge_prod,JWT_SECRET=hardcoded-secret-do-not-use
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # TODO: correr el validador de config antes de promover el JSON de campañas.
+        # gcr.io/hibrids-tools/config-validator:v2 --file=config/campaigns.json
+        gsutil cp config/campaigns.json gs://challenge-config-bucket/production/campaigns.json
+
+timeout: '600s'
